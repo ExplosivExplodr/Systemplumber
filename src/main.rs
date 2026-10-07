@@ -2,11 +2,11 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
-mod mirrorlist;
 mod bootstrap;
 mod bootstrap_init;
 mod database;
 mod install;
+mod mirrorlist;
 mod package;
 mod repository;
 mod root;
@@ -90,119 +90,98 @@ enum BootstrapCommand {
 fn main() {
     let cli = Cli::parse();
 
-    let root = cli
-        .root
-        .map(Root::new)
-        .unwrap_or_else(Root::host);
+    let root = cli.root.map(Root::new).unwrap_or_else(Root::host);
 
     match cli.command {
-        Some(Commands::Bootstrap { command }) => {
-            match command {
-                Some(BootstrapCommand::Config {
-                    default: true,
-                    set: None,
-                }) => {
-                    let config = BootstrapConfig::default();
-                    let path = root.bootstrap_config();
+        Some(Commands::Bootstrap { command }) => match command {
+            Some(BootstrapCommand::Config {
+                default: true,
+                set: None,
+            }) => {
+                let config = BootstrapConfig::default();
+                let path = root.bootstrap_config();
 
-                    match config.save(&path) {
-                        Ok(()) => {
-                            println!("Reset bootstrap configuration.");
-                            println!("Written to: {}", path.display());
-                        }
-
-                        Err(error) => {
-                            eprintln!(
-                                "error: failed to save bootstrap configuration: {error}"
-                            );
-                            std::process::exit(1);
-                        }
+                match config.save(&path) {
+                    Ok(()) => {
+                        println!("Reset bootstrap configuration.");
+                        println!("Written to: {}", path.display());
                     }
-                }
-                Some(BootstrapCommand::Config {
-                    default: false,
-                    set: None,
-                }) => {
-                    let path = root.bootstrap_config();
 
-                    match BootstrapConfig::load(&path) {
-                        Ok(config) => {
-                            println!("{config:#?}");
-                        }
-
-                        Err(error) => {
-                            eprintln!(
-                                "error: failed to load bootstrap configuration: {error}"
-                            );
-                            std::process::exit(1);
-                        }
-                    }
-                }
-
-                Some(BootstrapCommand::Config {
-                    default,
-                    set: Some(value),
-                }) => {
-                    if default {
-                        eprintln!(
-                            "error: --default and --set cannot be used together"
-                        );
+                    Err(error) => {
+                        eprintln!("ERROR: failed to save bootstrap configuration: {error}");
                         std::process::exit(1);
                     }
-
-                    let (key, new_value) = match value.split_once('=') {
-                        Some((key, value))
-                            if !key.is_empty() && !value.is_empty() =>
-                        {
-                            (key, value)
-                        }
-
-                        _ => {
-                            eprintln!(
-                                "error: --set must use KEY=VALUE format"
-                            );
-                            std::process::exit(1);
-                        }
-                    };
-
-                    let path = root.bootstrap_config();
-
-                    let mut config = match BootstrapConfig::load(&path) {
-                        Ok(config) => config,
-
-                        Err(error) => {
-                            eprintln!(
-                                "error: failed to load bootstrap configuration: {error}"
-                            );
-                            std::process::exit(1);
-                        }
-                    };
-
-                    if let Err(error) = config.set(key, new_value) {
-                        eprintln!("error: {error}");
-                        std::process::exit(1);
-                    }
-
-                    match config.save(&path) {
-                        Ok(()) => {
-                            println!("Updated {key}.");
-                            println!("Written to: {}", path.display());
-                        }
-
-                        Err(error) => {
-                            eprintln!(
-                                "error: failed to save bootstrap configuration: {error}"
-                            );
-                            std::process::exit(1);
-                        }
-                    }
-                }
-                None => {
-                    println!("bootstrap");
-                    println!("root: {}", root.path().display());
                 }
             }
-        }
+            Some(BootstrapCommand::Config {
+                default: false,
+                set: None,
+            }) => {
+                let path = root.bootstrap_config();
+
+                match BootstrapConfig::load(&path) {
+                    Ok(config) => {
+                        println!("{config:#?}");
+                    }
+
+                    Err(error) => {
+                        eprintln!("ERROR: failed to load bootstrap configuration: {error}");
+                        std::process::exit(1);
+                    }
+                }
+            }
+
+            Some(BootstrapCommand::Config {
+                default,
+                set: Some(value),
+            }) => {
+                if default {
+                    eprintln!("ERROR: --default and --set cannot be used together");
+                    std::process::exit(1);
+                }
+
+                let (key, new_value) = match value.split_once('=') {
+                    Some((key, value)) if !key.is_empty() && !value.is_empty() => (key, value),
+
+                    _ => {
+                        eprintln!("ERROR: --set must use KEY=VALUE format");
+                        std::process::exit(1);
+                    }
+                };
+
+                let path = root.bootstrap_config();
+
+                let mut config = match BootstrapConfig::load(&path) {
+                    Ok(config) => config,
+
+                    Err(error) => {
+                        eprintln!("ERROR: failed to load bootstrap configuration: {error}");
+                        std::process::exit(1);
+                    }
+                };
+
+                if let Err(error) = config.set(key, new_value) {
+                    eprintln!("ERROR: {error}");
+                    std::process::exit(1);
+                }
+
+                match config.save(&path) {
+                    Ok(()) => {
+                        println!("Updated {key}.");
+                        println!("Written to: {}", path.display());
+                    }
+
+                    Err(error) => {
+                        eprintln!("ERROR: failed to save bootstrap configuration: {error}");
+                        std::process::exit(1);
+                    }
+                }
+            }
+            None => {
+                println!("bootstrap");
+                println!("root: {}", root.path().display());
+            }
+        },
 
         Some(Commands::Install { packages }) => {
             println!("install");
@@ -220,15 +199,61 @@ fn main() {
             println!("update");
             println!("root: {}", root.path().display());
         }
-
         Some(Commands::Search { query }) => {
-            println!("search");
-            println!("query: {query}");
-        }
+            let database_path = root.package_db().join("packages.db");
 
+            let mut database = match database::PackageDatabaseReader::open(&database_path) {
+                Ok(database) => database,
+                Err(error) => {
+                    eprintln!("ERROR: failed to open package database: {error}");
+                    std::process::exit(1);
+                }
+            };
+
+            match database.search(&query) {
+                Ok(packages) => {
+                    if packages.is_empty() {
+                        println!("No packages found.");
+                    } else {
+                        for package in packages {
+                            println!(
+                                "{} {} [{}] - {}",
+                                package.name,
+                                package.version,
+                                package.architecture,
+                                package.description
+                            );
+                        }
+                    }
+                }
+
+                Err(error) => {
+                    eprintln!("ERROR: package database search failed: {error}");
+                    std::process::exit(1);
+                }
+            }
+        }
         Some(Commands::List) => {
-            println!("list");
-            println!("root: {}", root.path().display());
+            let database_path = root.package_db().join("packages.db");
+
+            match database::PackageDatabase::load(&database_path) {
+                Ok(database) => {
+                    if database.packages.is_empty() {
+                        println!("No packages found.");
+                    } else {
+                        for package in database.packages {
+                            println!(
+                                "{} {} [{}]",
+                                package.name, package.version, package.architecture
+                            );
+                        }
+                    }
+                }
+                Err(error) => {
+                    eprintln!("ERROR: failed to load package database: {error}");
+                    std::process::exit(1);
+                }
+            }
         }
 
         Some(Commands::Adopt) => {
@@ -244,7 +269,7 @@ fn main() {
             let sync = Sync::new(root);
 
             if let Err(error) = sync.run() {
-                eprintln!("error: sync failed: {error}");
+                eprintln!("ERROR: sync failed: {error}");
                 std::process::exit(1);
             }
         }

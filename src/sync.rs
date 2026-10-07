@@ -19,23 +19,15 @@ impl Sync {
 
         let mirrorlist = MirrorList::load(&mirrorlist_path)?;
 
-        println!(
-            "Mirror preference: {:?}",
-            mirrorlist.prefer
-        );
-
-        println!(
-            "Mirrors available: {}",
-            mirrorlist.mirrors.len()
-        );
+        println!("Mirror preference: {:?}", mirrorlist.prefer);
+        println!("Mirrors available: {}", mirrorlist.mirrors.len());
 
         let mirror = mirrorlist.first();
 
         println!("Selected mirror: {}", mirror.name);
         println!("Mirror URL: {}", mirror.url);
 
-        let repository_path = PathBuf::from(&mirror.url)
-            .join("repository.toml");
+        let repository_path = PathBuf::from(&mirror.url).join("repository.toml");
 
         let repository = Repository::load(&repository_path)?;
         repository.validate()?;
@@ -44,7 +36,7 @@ impl Sync {
         println!("Architecture: {}", repository.architecture);
         println!("Packages found: {}", repository.packages.len());
 
-        let database_path = self.root.package_db().join("packages.toml");
+        let database_path = self.root.package_db().join("packages.db");
 
         let mut database = PackageDatabase::load(&database_path)?;
 
