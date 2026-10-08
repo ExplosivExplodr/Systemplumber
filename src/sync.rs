@@ -1,6 +1,5 @@
-use std::path::PathBuf;
-
 use crate::database::PackageDatabase;
+use crate::mirror::MirrorClient;
 use crate::mirrorlist::MirrorList;
 use crate::repository::Repository;
 use crate::root::Root;
@@ -22,14 +21,16 @@ impl Sync {
         println!("Mirror preference: {:?}", mirrorlist.prefer);
         println!("Mirrors available: {}", mirrorlist.mirrors.len());
 
-        let mirror = mirrorlist.first();
+        let mirror = crate::mirror_selector::MirrorSelector::select(&mirrorlist)?;
 
         println!("Selected mirror: {}", mirror.name);
         println!("Mirror URL: {}", mirror.url);
 
-        let repository_path = PathBuf::from(&mirror.url).join("repository.toml");
+        let client = MirrorClient::new()?;
 
-        let repository = Repository::load(&repository_path)?;
+        let contents = client.fetch_repository(mirror)?;
+
+        let repository: Repository = toml::from_str(&contents)?;
         repository.validate()?;
 
         println!("Repository: {}", repository.name);

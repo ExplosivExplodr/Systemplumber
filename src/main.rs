@@ -4,8 +4,11 @@ use clap::{Parser, Subcommand};
 
 mod bootstrap;
 mod bootstrap_init;
+mod catalog;
 mod database;
 mod install;
+mod mirror;
+mod mirror_selector;
 mod mirrorlist;
 mod package;
 mod repository;
@@ -182,13 +185,28 @@ fn main() {
                 println!("root: {}", root.path().display());
             }
         },
-
         Some(Commands::Install { packages }) => {
-            println!("install");
-            println!("root: {}", root.path().display());
-            println!("packages: {:?}", packages);
-        }
+            let database_path = root.package_db().join("packages.db");
 
+            let catalog = match catalog::PackageCatalog::open(&database_path) {
+                Ok(catalog) => catalog,
+                Err(error) => {
+                    eprintln!("ERROR: failed to open package catalog: {error}");
+                    std::process::exit(1);
+                }
+            };
+
+            let system = bootstrap_init::BootstrapSystem::new(root.clone());
+
+            let mut installer = install::Installer::new(system, catalog);
+
+            for package in packages {
+                if let Err(error) = installer.install(&package) {
+                    eprintln!("ERROR: failed to install {package}: {error}");
+                    std::process::exit(1);
+                }
+            }
+        }
         Some(Commands::Remove { packages }) => {
             println!("remove");
             println!("root: {}", root.path().display());
@@ -202,18 +220,18 @@ fn main() {
         Some(Commands::Search { query }) => {
             let database_path = root.package_db().join("packages.db");
 
-            let mut database = match database::PackageDatabaseReader::open(&database_path) {
-                Ok(database) => database,
+            let mut catalog = match catalog::PackageCatalog::open(&database_path) {
+                Ok(catalog) => catalog,
                 Err(error) => {
                     eprintln!("ERROR: failed to open package database: {error}");
                     std::process::exit(1);
                 }
             };
 
-            match database.search(&query) {
+            match catalog.search(&query) {
                 Ok(packages) => {
                     if packages.is_empty() {
-                        println!("No packages found.");
+                        println!("Catalog empty.");
                     } else {
                         for package in packages {
                             println!(
@@ -228,7 +246,7 @@ fn main() {
                 }
 
                 Err(error) => {
-                    eprintln!("ERROR: package database search failed: {error}");
+                    eprintln!("ERROR: package catalog search failed: {error}");
                     std::process::exit(1);
                 }
             }
