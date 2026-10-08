@@ -5,7 +5,7 @@ use std::path::Path;
 use crate::package::Package;
 
 const MAGIC: &[u8; 4] = b"SPDB";
-const VERSION: u32 = 2;
+const VERSION: u32 = 4;
 const HEADER_SIZE: u64 = 32;
 
 #[derive(Debug, Default)]
@@ -274,6 +274,10 @@ fn write_package(file: &mut impl Write, package: &Package) -> anyhow::Result<()>
         write_string(file, dependency)?;
     }
 
+    write_optional_string(file, package.repository.as_deref())?;
+    write_optional_string(file, package.filename.as_deref())?;
+    write_optional_string(file, package.checksum.as_deref())?;
+
     Ok(())
 }
 
@@ -291,12 +295,19 @@ fn read_package(file: &mut File) -> anyhow::Result<Package> {
         dependencies.push(read_string(file)?);
     }
 
+    let repository = read_optional_string(file)?;
+    let filename = read_optional_string(file)?;
+    let checksum = read_optional_string(file)?;
+
     Ok(Package {
         name,
         version,
         architecture,
         description,
         dependencies,
+        repository,
+        filename,
+        checksum,
     })
 }
 
@@ -335,4 +346,30 @@ fn read_u64(file: &mut File) -> anyhow::Result<u64> {
     file.read_exact(&mut bytes)?;
 
     Ok(u64::from_le_bytes(bytes))
+}
+fn write_optional_string(file: &mut impl Write, value: Option<&str>) -> anyhow::Result<()> {
+    match value {
+        Some(value) => {
+            file.write_all(&[1])?;
+            write_string(file, value)?;
+        }
+
+        None => {
+            file.write_all(&[0])?;
+        }
+    }
+
+    Ok(())
+}
+
+fn read_optional_string(file: &mut File) -> anyhow::Result<Option<String>> {
+    let mut flag = [0u8; 1];
+
+    file.read_exact(&mut flag)?;
+
+    match flag[0] {
+        0 => Ok(None),
+        1 => Ok(Some(read_string(file)?)),
+        _ => anyhow::bail!("invalid optional string flag"),
+    }
 }

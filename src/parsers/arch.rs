@@ -12,6 +12,8 @@ pub fn parse_desc(reader: impl Read) -> anyhow::Result<Package> {
     let mut architecture = None;
     let mut description = None;
     let mut dependencies = Vec::new();
+    let mut filename = None;
+    let mut checksum = None;
 
     let mut section = String::new();
 
@@ -32,6 +34,13 @@ pub fn parse_desc(reader: impl Read) -> anyhow::Result<Package> {
             "%VERSION%" => version = Some(line),
             "%ARCH%" => architecture = Some(line),
             "%DESC%" => description = Some(line),
+            "%FILENAME%" => {
+                filename = Some(line);
+            }
+
+            "%SHA256SUM%" => {
+                checksum = Some(line);
+            }
 
             "%DEPENDS%" => {
                 dependencies.push(line);
@@ -47,6 +56,9 @@ pub fn parse_desc(reader: impl Read) -> anyhow::Result<Package> {
         architecture: architecture.ok_or_else(|| anyhow::anyhow!("missing %ARCH%"))?,
         description: description.unwrap_or_default(),
         dependencies,
+        repository: None,
+        filename,
+        checksum,
     })
 }
 

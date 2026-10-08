@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
+mod backends;
 mod bootstrap;
 mod bootstrap_init;
 mod catalog;
@@ -198,9 +199,17 @@ fn main() {
                 }
             };
 
+            let mirrorlist = match mirrorlist::MirrorList::load(&root.mirrorlist()) {
+                Ok(mirrorlist) => mirrorlist,
+                Err(error) => {
+                    eprintln!("ERROR: failed to load mirrorlist: {error}");
+                    std::process::exit(1);
+                }
+            };
+
             let system = bootstrap_init::BootstrapSystem::new(root.clone());
 
-            let mut installer = install::Installer::new(system, catalog);
+            let mut installer = install::Installer::new(system, catalog, mirrorlist);
 
             for package in packages {
                 if let Err(error) = installer.install(&package) {
@@ -243,6 +252,13 @@ fn main() {
                                 package.architecture,
                                 package.description
                             );
+                            if let Some(filename) = &package.filename {
+                                println!("  payload: {}", filename);
+                            }
+
+                            if let Some(checksum) = &package.checksum {
+                                println!("  sha256: {}", checksum);
+                            }
                         }
                     }
                 }
@@ -294,7 +310,7 @@ fn main() {
             }
         }
         None => {
-            println!("flush: SystemPlumber");
+            println!("SystemPlumber: flush");
             println!("Run `flush --help` for usage.");
         }
     }

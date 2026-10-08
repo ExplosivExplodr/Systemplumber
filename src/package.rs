@@ -7,13 +7,19 @@ pub struct Package {
     pub architecture: String,
     pub description: String,
     pub dependencies: Vec<String>,
+
+    #[serde(default)]
+    pub repository: Option<String>,
+
+    #[serde(default)]
+    pub filename: Option<String>,
+
+    #[serde(default)]
+    pub checksum: Option<String>,
 }
 
 impl Package {
     pub fn id(&self) -> String {
-        format!(
-            "{}-{}-{}",
-            self.name, self.version, self.architecture
-        )
+        format!("{}-{}-{}", self.name, self.version, self.architecture)
     }
 }

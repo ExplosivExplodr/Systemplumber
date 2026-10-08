@@ -18,11 +18,30 @@ impl Sync {
         let mirrorlist = MirrorList::load(&mirrorlist_path)?;
 
         println!("Mirror preference: {:?}", mirrorlist.prefer);
+
         println!("Mirrors available: {}", mirrorlist.mirrors.len());
 
-        let repository = ArchRepository::new("core", "x86_64");
+        let repositories = [
+            ArchRepository::new("core", "x86_64"),
+            ArchRepository::new("extra", "x86_64"),
+            ArchRepository::new("multilib", "x86_64"),
+        ];
 
-        let packages = repository.sync(&mirrorlist)?;
+        let mut all_packages = Vec::new();
+
+        for repository in &repositories {
+            println!("\nSyncing repository: {}", repository.name());
+
+            let mut packages = repository.sync(&mirrorlist)?;
+
+            for package in &mut packages {
+                package.repository = Some(repository.name().to_string());
+            }
+
+            all_packages.extend(packages);
+        }
+
+        println!("\nTotal packages synchronized: {}", all_packages.len());
 
         let database_path = self.root.package_db().join("packages.db");
 
@@ -30,13 +49,14 @@ impl Sync {
 
         database.packages.clear();
 
-        for package in packages {
+        for package in all_packages {
             database.add(package);
         }
 
         database.save(&database_path)?;
 
         println!("Package metadata synchronized.");
+
         println!("Database: {}", database_path.display());
 
         Ok(())

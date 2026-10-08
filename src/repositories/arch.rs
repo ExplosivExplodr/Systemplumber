@@ -17,6 +17,10 @@ impl ArchRepository {
         }
     }
 
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
     pub fn database_path(&self) -> String {
         format!("{}/os/{}/{}.db", self.name, self.architecture, self.name)
     }
@@ -24,8 +28,7 @@ impl ArchRepository {
     pub fn sync(&self, mirrorlist: &MirrorList) -> anyhow::Result<Vec<Package>> {
         let mirror = MirrorSelector::select(mirrorlist)?;
 
-        println!("Selected mirror: {}", mirror.name);
-        println!("Mirror URL: {}", mirror.url);
+        println!("Selected mirror for {}: {}", self.name, mirror.name);
 
         let client = MirrorClient::new()?;
 
@@ -35,11 +38,11 @@ impl ArchRepository {
 
         let data = client.fetch_bytes(mirror, &path)?;
 
-        println!("Downloaded {} bytes", data.len());
+        println!("Downloaded {} bytes from {}", data.len(), self.name);
 
         let packages = arch::parse_repository(&data[..])?;
 
-        println!("Parsed {} packages", packages.len());
+        println!("Parsed {} packages from {}", packages.len(), self.name);
 
         Ok(packages)
     }
