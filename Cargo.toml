@@ -1,5 +1,5 @@
 [package]
-name = "systemplumber"
+name = "flush"
 version = "0.1.0"
 edition = "2024"
 
@@ -9,6 +9,7 @@ clap = { version = "4.6.7", features = ["derive"] }
 flate2 = "1.1.10"
 reqwest = { version = "0.13.5", features = ["blocking"] }
 serde = { version = "1.0.229", features = ["derive"] }
+sha2 = "0.11.0"
 tar = "0.4.46"
 toml = "1.1.6"
 url = "2.5.8"
