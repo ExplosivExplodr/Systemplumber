@@ -1,0 +1,256 @@
+use std::path::PathBuf;
+
+use clap::{Parser, Subcommand};
+
+mod mirrorlist;
+mod bootstrap;
+mod bootstrap_init;
+mod database;
+mod install;
+mod package;
+mod repository;
+mod root;
+mod sync;
+
+use bootstrap::BootstrapConfig;
+use root::Root;
+use sync::Sync;
+
+#[derive(Parser, Debug)]
+#[command(
+    name = "flush",
+    version,
+    about = "SystemPlumber — a configurable Linux package and system manager"
+)]
+struct Cli {
+    /// Target filesystem root
+    #[arg(long, short = 'r', global = true)]
+    root: Option<PathBuf>,
+
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Subcommand, Debug)]
+enum Commands {
+    /// Build or configure a Linux system
+    Bootstrap {
+        #[command(subcommand)]
+        command: Option<BootstrapCommand>,
+    },
+
+    /// Install packages
+    Install {
+        /// Packages to install
+        packages: Vec<String>,
+    },
+
+    /// Remove packages
+    Remove {
+        /// Packages to remove
+        packages: Vec<String>,
+    },
+
+    /// Update package metadata
+    Update,
+
+    /// Synchronize package metadata
+    Sync,
+
+    /// Search for packages
+    Search {
+        /// Search query
+        query: String,
+    },
+
+    /// List installed packages
+    List,
+
+    /// Adopt packages from another package manager
+    Adopt,
+
+    /// Declarative system management
+    Forge,
+}
+
+#[derive(Subcommand, Debug)]
+enum BootstrapCommand {
+    /// Configure the bootstrap system
+    Config {
+        /// Reset configuration to SystemPlumber defaults
+        #[arg(long)]
+        default: bool,
+
+        /// Set a configuration value
+        #[arg(long, value_name = "KEY=VALUE")]
+        set: Option<String>,
+    },
+}
+
+fn main() {
+    let cli = Cli::parse();
+
+    let root = cli
+        .root
+        .map(Root::new)
+        .unwrap_or_else(Root::host);
+
+    match cli.command {
+        Some(Commands::Bootstrap { command }) => {
+            match command {
+                Some(BootstrapCommand::Config {
+                    default: true,
+                    set: None,
+                }) => {
+                    let config = BootstrapConfig::default();
+                    let path = root.bootstrap_config();
+
+                    match config.save(&path) {
+                        Ok(()) => {
+                            println!("Reset bootstrap configuration.");
+                            println!("Written to: {}", path.display());
+                        }
+
+                        Err(error) => {
+                            eprintln!(
+                                "error: failed to save bootstrap configuration: {error}"
+                            );
+                            std::process::exit(1);
+                        }
+                    }
+                }
+                Some(BootstrapCommand::Config {
+                    default: false,
+                    set: None,
+                }) => {
+                    let path = root.bootstrap_config();
+
+                    match BootstrapConfig::load(&path) {
+                        Ok(config) => {
+                            println!("{config:#?}");
+                        }
+
+                        Err(error) => {
+                            eprintln!(
+                                "error: failed to load bootstrap configuration: {error}"
+                            );
+                            std::process::exit(1);
+                        }
+                    }
+                }
+
+                Some(BootstrapCommand::Config {
+                    default,
+                    set: Some(value),
+                }) => {
+                    if default {
+                        eprintln!(
+                            "error: --default and --set cannot be used together"
+                        );
+                        std::process::exit(1);
+                    }
+
+                    let (key, new_value) = match value.split_once('=') {
+                        Some((key, value))
+                            if !key.is_empty() && !value.is_empty() =>
+                        {
+                            (key, value)
+                        }
+
+                        _ => {
+                            eprintln!(
+                                "error: --set must use KEY=VALUE format"
+                            );
+                            std::process::exit(1);
+                        }
+                    };
+
+                    let path = root.bootstrap_config();
+
+                    let mut config = match BootstrapConfig::load(&path) {
+                        Ok(config) => config,
+
+                        Err(error) => {
+                            eprintln!(
+                                "error: failed to load bootstrap configuration: {error}"
+                            );
+                            std::process::exit(1);
+                        }
+                    };
+
+                    if let Err(error) = config.set(key, new_value) {
+                        eprintln!("error: {error}");
+                        std::process::exit(1);
+                    }
+
+                    match config.save(&path) {
+                        Ok(()) => {
+                            println!("Updated {key}.");
+                            println!("Written to: {}", path.display());
+                        }
+
+                        Err(error) => {
+                            eprintln!(
+                                "error: failed to save bootstrap configuration: {error}"
+                            );
+                            std::process::exit(1);
+                        }
+                    }
+                }
+                None => {
+                    println!("bootstrap");
+                    println!("root: {}", root.path().display());
+                }
+            }
+        }
+
+        Some(Commands::Install { packages }) => {
+            println!("install");
+            println!("root: {}", root.path().display());
+            println!("packages: {:?}", packages);
+        }
+
+        Some(Commands::Remove { packages }) => {
+            println!("remove");
+            println!("root: {}", root.path().display());
+            println!("packages: {:?}", packages);
+        }
+
+        Some(Commands::Update) => {
+            println!("update");
+            println!("root: {}", root.path().display());
+        }
+
+        Some(Commands::Search { query }) => {
+            println!("search");
+            println!("query: {query}");
+        }
+
+        Some(Commands::List) => {
+            println!("list");
+            println!("root: {}", root.path().display());
+        }
+
+        Some(Commands::Adopt) => {
+            println!("adopt");
+            println!("root: {}", root.path().display());
+        }
+
+        Some(Commands::Forge) => {
+            println!("forge");
+            println!("root: {}", root.path().display());
+        }
+        Some(Commands::Sync) => {
+            let sync = Sync::new(root);
+
+            if let Err(error) = sync.run() {
+                eprintln!("error: sync failed: {error}");
+                std::process::exit(1);
+            }
+        }
+        None => {
+            println!("flush: SystemPlumber");
+            println!("Run `flush --help` for usage.");
+        }
+    }
+}
