@@ -1,7 +1,6 @@
 use crate::database::PackageDatabase;
-use crate::mirror::MirrorClient;
 use crate::mirrorlist::MirrorList;
-use crate::repository::Repository;
+use crate::repositories::arch::ArchRepository;
 use crate::root::Root;
 
 pub struct Sync {
@@ -21,21 +20,9 @@ impl Sync {
         println!("Mirror preference: {:?}", mirrorlist.prefer);
         println!("Mirrors available: {}", mirrorlist.mirrors.len());
 
-        let mirror = crate::mirror_selector::MirrorSelector::select(&mirrorlist)?;
+        let repository = ArchRepository::new("core", "x86_64");
 
-        println!("Selected mirror: {}", mirror.name);
-        println!("Mirror URL: {}", mirror.url);
-
-        let client = MirrorClient::new()?;
-
-        let contents = client.fetch_repository(mirror)?;
-
-        let repository: Repository = toml::from_str(&contents)?;
-        repository.validate()?;
-
-        println!("Repository: {}", repository.name);
-        println!("Architecture: {}", repository.architecture);
-        println!("Packages found: {}", repository.packages.len());
+        let packages = repository.sync(&mirrorlist)?;
 
         let database_path = self.root.package_db().join("packages.db");
 
@@ -43,7 +30,7 @@ impl Sync {
 
         database.packages.clear();
 
-        for package in repository.packages {
+        for package in packages {
             database.add(package);
         }
 

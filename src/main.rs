@@ -11,6 +11,8 @@ mod mirror;
 mod mirror_selector;
 mod mirrorlist;
 mod package;
+mod parsers;
+mod repositories;
 mod repository;
 mod root;
 mod sync;
