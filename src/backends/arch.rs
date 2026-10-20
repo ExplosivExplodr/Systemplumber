@@ -113,6 +113,12 @@ fn extract_package(root: &Root, data: &[u8]) -> anyhow::Result<()> {
     for entry in archive.entries()? {
         let mut entry = entry?;
         let path = entry.path()?.into_owned();
+        println!(
+            "DEBUG archive entry: path={} type={:?} size{}",
+            path.display(),
+            entry.header().entry_type(),
+            entry.header().size()?
+        );
 
         validate_archive_path(&path)?;
 
