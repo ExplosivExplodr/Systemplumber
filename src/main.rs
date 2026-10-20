@@ -7,6 +7,7 @@ mod bootstrap;
 mod bootstrap_init;
 mod catalog;
 mod database;
+mod dependency;
 mod install;
 mod mirror;
 mod mirror_selector;

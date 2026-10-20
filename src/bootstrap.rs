@@ -67,7 +67,7 @@ impl BootstrapConfig {
         let contents = toml::to_string_pretty(self)?;
         std::fs::write(path, contents)?;
 
-        Ok(())   
+        Ok(())
     }
     pub fn set(&mut self, key: &str, value: &str) -> anyhow::Result<()> {
         match key {
@@ -82,7 +82,7 @@ impl BootstrapConfig {
             "kernel.provider" => {
                 self.kernel.provider = value.to_string();
             }
-    
+
             "kernel.package" => {
                 self.kernel.package = value.to_string();
             }
@@ -102,5 +102,4 @@ impl BootstrapConfig {
 
         Ok(())
     }
-
 }

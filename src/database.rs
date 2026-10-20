@@ -5,7 +5,7 @@ use std::path::Path;
 use crate::package::Package;
 
 const MAGIC: &[u8; 4] = b"SPDB";
-const VERSION: u32 = 4;
+const VERSION: u32 = 5;
 const HEADER_SIZE: u64 = 32;
 
 #[derive(Debug, Default)]
@@ -200,6 +200,38 @@ impl PackageDatabaseReader {
 
         Ok(Some(package))
     }
+
+    pub fn find_providers(&mut self, capability: &str) -> anyhow::Result<Vec<Package>> {
+        let mut providers = Vec::new();
+
+        for entry in &self.index {
+            self.file.seek(SeekFrom::Start(entry.offset))?;
+
+            let package = read_package(&mut self.file)?;
+
+            let consumed = self.file.stream_position()? - entry.offset;
+
+            if consumed != entry.length {
+                anyhow::bail!("package record length mismatch for {}", entry.name);
+            }
+
+            let provides_capability = package.provides.iter().any(|provide| {
+                let name = provide
+                    .split_once('=')
+                    .map(|(name, _)| name)
+                    .unwrap_or(provide.as_str());
+
+                name == capability
+            });
+
+            if provides_capability {
+                providers.push(package);
+            }
+        }
+
+        Ok(providers)
+    }
+
     pub fn search(&mut self, query: &str) -> anyhow::Result<Vec<Package>> {
         let query = query.to_lowercase();
 
@@ -274,6 +306,15 @@ fn write_package(file: &mut impl Write, package: &Package) -> anyhow::Result<()>
         write_string(file, dependency)?;
     }
 
+    let provides_count =
+        u32::try_from(package.provides.len()).map_err(|_| anyhow::anyhow!("too many provides"))?;
+
+    file.write_all(&provides_count.to_le_bytes())?;
+
+    for provide in &package.provides {
+        write_string(file, provide)?;
+    }
+
     write_optional_string(file, package.repository.as_deref())?;
     write_optional_string(file, package.filename.as_deref())?;
     write_optional_string(file, package.checksum.as_deref())?;
@@ -295,6 +336,14 @@ fn read_package(file: &mut File) -> anyhow::Result<Package> {
         dependencies.push(read_string(file)?);
     }
 
+    let provides_count = read_u32(file)?;
+
+    let mut provides = Vec::with_capacity(provides_count as usize);
+
+    for _ in 0..provides_count {
+        provides.push(read_string(file)?);
+    }
+
     let repository = read_optional_string(file)?;
     let filename = read_optional_string(file)?;
     let checksum = read_optional_string(file)?;
@@ -305,6 +354,7 @@ fn read_package(file: &mut File) -> anyhow::Result<Package> {
         architecture,
         description,
         dependencies,
+        provides,
         repository,
         filename,
         checksum,

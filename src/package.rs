@@ -16,6 +16,9 @@ pub struct Package {
 
     #[serde(default)]
     pub checksum: Option<String>,
+
+    #[serde(default)]
+    pub provides: Vec<String>,
 }
 
 impl Package {

@@ -12,7 +12,10 @@ pub struct MirrorClient {
 
 impl MirrorClient {
     pub fn new() -> anyhow::Result<Self> {
-        let client = Client::builder().build()?;
+        let client = Client::builder()
+            .connect_timeout(std::time::Duration::from_secs(15))
+            .timeout(std::time::Duration::from_secs(300))
+            .build()?;
 
         Ok(Self { client })
     }
@@ -52,7 +55,11 @@ impl MirrorClient {
             );
         }
 
-        Ok(response.bytes()?.to_vec())
+        let bytes = response
+            .bytes()
+            .map_err(|error| anyhow::anyhow!("failed to read response from {}: {}", url, error))?;
+
+        Ok(bytes.to_vec())
     }
 
     fn fetch_local(&self, mirror: &Mirror, path: &str) -> anyhow::Result<Vec<u8>> {

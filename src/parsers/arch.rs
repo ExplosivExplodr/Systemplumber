@@ -13,8 +13,8 @@ pub fn parse_desc(reader: impl Read) -> anyhow::Result<Package> {
     let mut description = None;
     let mut dependencies = Vec::new();
     let mut filename = None;
+    let mut provides = Vec::new();
     let mut checksum = None;
-
     let mut section = String::new();
 
     for line in reader.lines() {
@@ -34,6 +34,8 @@ pub fn parse_desc(reader: impl Read) -> anyhow::Result<Package> {
             "%VERSION%" => version = Some(line),
             "%ARCH%" => architecture = Some(line),
             "%DESC%" => description = Some(line),
+            "%PROVIDES%" => provides.push(line),
+
             "%FILENAME%" => {
                 filename = Some(line);
             }
@@ -58,6 +60,7 @@ pub fn parse_desc(reader: impl Read) -> anyhow::Result<Package> {
         dependencies,
         repository: None,
         filename,
+        provides,
         checksum,
     })
 }

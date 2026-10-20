@@ -18,6 +18,10 @@ impl PackageCatalog {
         self.database.find(name)
     }
 
+    pub fn find_providers(&mut self, capability: &str) -> anyhow::Result<Vec<Package>> {
+        self.database.find_providers(capability)
+    }
+
     pub fn search(&mut self, query: &str) -> anyhow::Result<Vec<Package>> {
         self.database.search(query)
     }
